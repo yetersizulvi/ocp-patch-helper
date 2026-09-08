@@ -1,0 +1,90 @@
+# Copy this manifest per cluster and change CLUSTER_ID, ENVIRONMENT,
+# NAMESPACE_PATTERN and MASTER_URL. All collection periods are managed here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocp-patch-agent-config
+  namespace: ocp-patch-agent
+data:
+  PATCH_AGENT_CLUSTER_ID: REPLACE_WITH_CLUSTER_ID
+  PATCH_AGENT_ENVIRONMENT: test
+  PATCH_AGENT_NAMESPACE_PATTERN: ^test-
+  PATCH_AGENT_MASTER_URL: http://ocp-patch-master:8090
+  PATCH_AGENT_ALLOW_HTTP: "true"
+  PATCH_AGENT_REQUEST_TIMEOUT_SECONDS: "5"
+  PATCH_AGENT_FLOW_CONFIG: /etc/patch-agent/flow/flows.yaml
+  PATCH_AGENT_REGISTRY_PREFIX: REPLACE_WITH_APPLICATION_REGISTRY_PREFIX
+  LLM_URL: REPLACE_WITH_OPENAI_COMPATIBLE_CHAT_COMPLETIONS_URL
+  LLM_MODEL: REPLACE_WITH_MODEL_NAME
+  LLM_CA_FILE: /etc/patch-agent/ca/ca-bundle.crt
+  LLM_TIMEOUT_SECONDS: "30"
+  LOG_LEVEL: INFO
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocp-patch-agent-flow
+  namespace: ocp-patch-agent
+data:
+  flows.yaml: |
+    flows:
+      - apiVersion: assistant.example.io/v1alpha1
+        kind: PatchAgentFlow
+        metadata:
+          name: monthly-ocp-patch
+        spec:
+          control:
+            # Agent IDLE iken master START/STOP komutunu kontrol etme sıklığı.
+            control_poll_seconds: 10
+            # IDLE/RUNNING state heartbeat sıklığı.
+            heartbeat_seconds: 30
+            # Master yenilemezse process bu süre sonunda kendini durdurur.
+            default_lease_seconds: 120
+            # Mounted ConfigMap flow değişikliğini yeniden okuma sıklığı.
+            flow_reload_seconds: 30
+            # Aynı pod listesini kullanan collector'ların API çağrısı paylaşımı.
+            shared_cache_seconds: 3
+          collectors:
+            - id: image-rollout
+              type: image_rollout
+              enabled: true
+              # Image tag kontrol sıklığı.
+              interval_seconds: 3
+              initial_delay_seconds: 0
+              emit_only_changes: true
+              options:
+                max_mismatches: 200
+
+            - id: health-errors
+              type: health_errors
+              enabled: true
+              # Pod, workload, node, operator ve MCP hata toplama sıklığı.
+              interval_seconds: 30
+              initial_delay_seconds: 0
+              emit_only_changes: true
+              options:
+                max_errors: 300
+
+            - id: crash-triage
+              type: crash_triage
+              enabled: true
+              # Sadece crash podları describe+event+LLM inceleme sıklığı.
+              interval_seconds: 30
+              initial_delay_seconds: 2
+              emit_only_changes: true
+              options:
+                max_crash_pods: 20
+                max_events_per_pod: 10
+                llm_enabled: true
+---
+# Replace with the CA chain trusted by the master and LLM endpoints.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ocp-patch-agent-trusted-ca
+  namespace: ocp-patch-agent
+data:
+  ca-bundle.crt: |
+    -----BEGIN CERTIFICATE-----
+    REPLACE_WITH_INTERNAL_CA_CHAIN
+    -----END CERTIFICATE-----

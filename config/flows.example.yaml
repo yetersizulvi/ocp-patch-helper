@@ -1,0 +1,41 @@
+flows:
+  - apiVersion: assistant.example.io/v1alpha1
+    kind: PatchAgentFlow
+    metadata:
+      name: monthly-ocp-patch
+    spec:
+      control:
+        control_poll_seconds: 10
+        heartbeat_seconds: 30
+        default_lease_seconds: 120
+        flow_reload_seconds: 30
+        shared_cache_seconds: 3
+      collectors:
+        - id: image-rollout
+          type: image_rollout
+          enabled: true
+          interval_seconds: 3
+          initial_delay_seconds: 0
+          emit_only_changes: true
+          options:
+            max_mismatches: 200
+
+        - id: health-errors
+          type: health_errors
+          enabled: true
+          interval_seconds: 30
+          initial_delay_seconds: 0
+          emit_only_changes: true
+          options:
+            max_errors: 300
+
+        - id: crash-triage
+          type: crash_triage
+          enabled: true
+          interval_seconds: 30
+          initial_delay_seconds: 2
+          emit_only_changes: true
+          options:
+            max_crash_pods: 20
+            max_events_per_pod: 10
+            llm_enabled: true

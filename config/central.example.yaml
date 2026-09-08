@@ -1,0 +1,44 @@
+# All cluster names, endpoints and namespace scopes are deployment-time values.
+clusters:
+  - id: local-test
+    connection: inCluster
+    api_url: https://kubernetes.default.svc:443
+    token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    namespace_pattern: '^(test-|uat-)'
+  # - id: remote-test
+  #   connection: remote
+  #   api_url: https://api.remote.example.com:6443
+  #   token_file: /etc/patch/credentials/remote-test/token
+  #   ca_file: /etc/patch/trust/remote-test/ca.crt
+  #   namespace_pattern: '^(test-|uat-)'
+flows:
+  patch-live:
+    interval_seconds: 5
+    request_timeout_seconds: 10
+    scan_timeout_seconds: 120
+    page_size: 200
+    max_page_bytes: 4194304
+    max_objects: 20000
+    max_rows: 30000
+    session_max_minutes: 120
+    failure_backoff_max_seconds: 60
+    stale_after_seconds: 20
+    resources: [deployments, statefulsets, daemonsets]
+  slow-check:
+    interval_seconds: 30
+    page_size: 100
+    session_max_minutes: 120
+    stale_after_seconds: 90
+images:
+  registry_prefixes: [] # Empty includes all regular container images, including sidecars.
+  tag_match_mode: exact
+  release_pattern: '^(\d+\.\d+\.\d+)(?:-.+)?$'
+storage:
+  database_path: /data/patch.db
+  retention_days: 14
+  max_database_mb: 512
+config_reload_seconds: 15
+stream_seconds: 2
+max_stream_clients: 30
+demo: false

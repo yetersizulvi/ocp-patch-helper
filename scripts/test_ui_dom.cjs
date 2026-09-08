@@ -1,0 +1,46 @@
+// Offline DOM interaction test against a real demo HTTP server; not visual browser QA.
+const {JSDOM}=require(process.env.PATCH_JSDOM_MODULE || 'jsdom');
+const {spawn}=require('node:child_process');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'patch-ui-'));
+const config=fs.readFileSync('config/central.demo.yaml','utf8').replace('/tmp/patch-monitor-demo/patch.db',path.join(temp,'state.db'));
+fs.writeFileSync(path.join(temp,'config.yaml'),config);
+const port=18197,base=`http://127.0.0.1:${port}`;
+const server=spawn(process.env.PATCH_TEST_PYTHON||'python',['-m','uvicorn','app.central:create_app','--factory','--host','127.0.0.1','--port',String(port)],{env:{...process.env,PATCH_CONFIG_FILE:path.join(temp,'config.yaml')},stdio:'ignore'});
+let dom;
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function until(fn){for(let i=0;i<150;i++){if(await fn())return;await sleep(30)}throw Error('UI condition timed out')}
+(async()=>{try{
+await until(async()=>{try{return (await fetch(base+'/health/ready')).ok}catch{return false}});
+dom=new JSDOM(fs.readFileSync('app/central_ui.html','utf8'),{url:base,runScripts:'outside-only'});
+const w=dom.window;w.fetch=(url,options)=>fetch(new URL(url,base),options);w.EventSource=class{addEventListener(){} close(){}};
+w.eval(fs.readFileSync('app/central_ui.js','utf8')+'\nwindow.patchTestRefresh=refresh;');
+const $=id=>w.document.getElementById(id);
+await until(()=>$('template').options.length>0&&$('flowClusters').querySelectorAll('input').length===2);
+assert.equal($('match').value,'release');
+$('flowPattern').value='test-*,uat-*';
+$('designName').value='DOM test flow';await $('saveDesign').onclick();
+await until(()=>$('feedback').textContent.includes('kaydedildi'));
+$('flowPattern').value='prod-*';
+$('flowLibrary').querySelector('[data-design]').click();
+assert.equal($('flowPattern').value,'test-*,uat-*');
+assert.equal($('designName').value,'DOM test flow');
+await $('create').onclick();await until(()=>$('monitorArea').hidden===false);
+await until(async()=>{await w.patchTestRefresh(true);return $('statusTitle').textContent==='Başlangıç hazır'});
+assert.match($('clusterCards').textContent,/demo-local/);assert.match($('clusterCards').textContent,/demo-remote/);
+await $('primaryAction').onclick();await until(async()=>{await w.patchTestRefresh(true);return Number($('ready').textContent)===4});
+$('filterCluster').value='demo-local';$('filterCluster').dispatchEvent(new w.Event('change'));
+await until(()=>Number($('ready').textContent)===2);assert.equal(Number($('old').textContent),1);
+$('pause').click();$('filterCluster').value='demo-remote';$('filterCluster').dispatchEvent(new w.Event('change'));
+await until(()=>$('left').textContent.includes('demo-remote'));$('pause').click();
+w.document.querySelector('[data-tab="compare"]').click();await until(()=>$('changes').textContent.includes('Düzeldi'));
+assert.equal($('liveView').hidden,true);assert.equal($('compareView').hidden,false);
+$('patternPreset').value='uat-*';$('patternPreset').dispatchEvent(new w.Event('change'));
+await until(()=>$('changes').textContent.includes('karşılaştırma sonucu yok'));
+$('clearFilters').click();await until(()=>$('changes').textContent.includes('Düzeldi'));
+w.document.querySelector('[data-tab="history"]').click();await until(()=>$('historyList').textContent.includes('1.4.1'));
+w.document.querySelector('[data-tab="live"]').click();await w.patchTestRefresh(true);
+await $('stop').onclick();await until(async()=>{await w.patchTestRefresh(true);return $('statusTitle').textContent==='Durduruldu'});
+assert.equal($('error').hidden,true,$('error').textContent);
+console.log('PASS: flow save/create, baseline/start, cluster counts, namespace glob, tab transitions, history and stop with real API');
+}catch(e){console.error('DOM CHECK FAILED:',e);throw e}finally{await sleep(300);if(dom)dom.window.close();server.kill('SIGTERM');await new Promise(resolve=>server.once('exit',resolve));fs.rmSync(temp,{recursive:true,force:true})}})().catch(e=>{console.error(e);process.exitCode=1});

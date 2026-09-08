@@ -1,0 +1,111 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patch-monitor-data
+  namespace: patch-monitor
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patch-monitor
+  namespace: patch-monitor
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: patch-monitor
+  template:
+    metadata:
+      labels:
+        app: patch-monitor
+    spec:
+      serviceAccountName: patch-reader
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: 45
+      containers:
+        - name: monitor
+          image: quay.io/REPLACE_WITH_QUAY_NAMESPACE/openshift-ai-assistant:0.7.2
+          command: [uvicorn]
+          args: [app.central:create_app, --factory, --host, '0.0.0.0', --port, '8080', --workers, '1', --no-server-header]
+          env:
+            - name: PATCH_CONFIG_FILE
+              value: /etc/patch/config/central.yaml
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: '1'
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+            seccompProfile:
+              type: RuntimeDefault
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            initialDelaySeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/patch/config
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            # For each remote cluster add matching token + CA mounts and volumes:
+            # - name: remote-token
+            #   mountPath: /etc/patch/credentials/remote-test
+            #   readOnly: true
+            # - name: remote-ca
+            #   mountPath: /etc/patch/trust/remote-test
+            #   readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: patch-monitor-config
+        - name: data
+          persistentVolumeClaim:
+            claimName: patch-monitor-data
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+        # - name: remote-token
+        #   secret:
+        #     secretName: patch-remote-test-token
+        # - name: remote-ca
+        #   configMap:
+        #     name: patch-remote-test-ca
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patch-monitor
+  namespace: patch-monitor
+spec:
+  selector:
+    app: patch-monitor
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

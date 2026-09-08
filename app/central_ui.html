@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Patch Monitor · Canlı geçiş takibi</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f5f8;
+        --ink: #182839;
+        --muted: #627184;
+        --border: #dce3eb;
+        --accent: #176d63;
+        --panel: #fff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      button {
+        cursor: pointer;
+        border: 1px solid var(--border);
+        background: white;
+        color: var(--ink);
+        border-radius: 7px;
+        padding: 10px 15px;
+        font-weight: 600;
+      }
+      button:hover {
+        border-color: var(--accent);
+      }
+      button:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .primary {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      input,
+      select {
+        border: 1px solid #bdcad6;
+        background: white;
+        border-radius: 6px;
+        padding: 10px;
+        color: var(--ink);
+        min-width: 0;
+      }
+      input[type="checkbox"] {
+        accent-color: var(--accent);
+      }
+      header {
+        background: #172b35;
+        color: white;
+        padding: 22px 32px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      header h1 {
+        font-size: 23px;
+        margin: 0;
+      }
+      header p {
+        color: #b6cbd1;
+        margin: 6px 0 0;
+        font-size: 13px;
+      }
+      #connection {
+        font-size: 12px;
+      }
+      nav {
+        background: white;
+        border-bottom: 1px solid var(--border);
+        padding: 0 32px;
+        display: flex;
+        gap: 25px;
+      }
+      nav button {
+        border: 0;
+        border-bottom: 3px solid transparent;
+        border-radius: 0;
+        padding: 18px 3px;
+        color: var(--muted);
+      }
+      nav button.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      main {
+        max-width: 1680px;
+        margin: auto;
+        padding: 25px 32px;
+      }
+      .heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+        gap: 16px;
+      }
+      h2 {
+        font-size: 24px;
+        margin: 0 0 7px;
+      }
+      h3 {
+        font-size: 17px;
+        margin: 0 0 10px;
+      }
+      p {
+        line-height: 1.55;
+      }
+      .muted,
+      small {
+        color: var(--muted);
+      }
+      small {
+        font-size: 12px;
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        overflow: hidden;
+      }
+      .pad {
+        padding: 24px;
+      }
+      .builder {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(310px, 1fr);
+        gap: 24px;
+      }
+      .fields {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .field {
+        display: grid;
+        gap: 7px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .field small {
+        font-weight: 400;
+      }
+      .wide {
+        grid-column: 1/-1;
+      }
+      .section-label {
+        margin: 24px 0 14px;
+        padding-top: 18px;
+        border-top: 1px solid var(--border);
+        font-weight: 700;
+      }
+      .choices {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      .choices label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        padding: 12px;
+        background: #f7fafb;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 20px;
+      }
+      .preview {
+        background: #e9f3ef;
+        border: 1px solid #bedcd0;
+        padding: 18px;
+        border-radius: 8px;
+      }
+      .steps {
+        padding-left: 24px;
+      }
+      .steps li {
+        padding: 9px 0;
+        line-height: 1.5;
+      }
+      .hint {
+        font-size: 13px;
+        border-left: 3px solid #d69c36;
+        padding: 10px 14px;
+        background: #fff8e8;
+        margin-top: 18px;
+      }
+      #error {
+        color: #922c2c;
+        background: #fff0ef;
+        border: 1px solid #e8b6b0;
+        border-radius: 8px;
+        padding: 14px;
+        margin-bottom: 18px;
+      }
+      #feedback {
+        color: #176d63;
+        margin-top: 15px;
+        white-space: pre-wrap;
+      }
+      #scopeBar {
+        margin: 20px 0;
+        padding: 16px;
+        display: flex;
+        gap: 14px;
+        flex-wrap: wrap;
+        align-items: end;
+      }
+      #scopeBar .field {
+        flex: 1;
+        min-width: 140px;
+      }
+      #scopeBar .check {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font-size: 13px;
+        padding: 10px 0;
+      }
+      .banner {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 20px;
+        background: #e7eef5;
+        border: 1px solid #cbd9e5;
+        padding: 18px;
+        border-radius: 8px;
+        margin: 15px 0;
+      }
+      .banner b {
+        display: block;
+        margin-bottom: 6px;
+      }
+      .cluster-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+      }
+      .cluster-card {
+        padding: 18px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: white;
+      }
+      .cluster-card h3 {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 12px;
+        margin: 18px 0;
+      }
+      .stat {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 18px;
+        text-align: left;
+        font-size: 12px;
+      }
+      .stat strong {
+        display: block;
+        font-size: 28px;
+        margin-top: 7px;
+      }
+      .progress {
+        background: #dde5e9;
+        border-radius: 9px;
+        height: 9px;
+        overflow: hidden;
+        margin: 10px 0;
+      }
+      .progress span {
+        display: block;
+        background: var(--accent);
+        height: 100%;
+        transition: width 0.3s;
+      }
+      .tables {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+      }
+      .table-head {
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: start;
+        gap: 12px;
+      }
+      .table-head p {
+        margin: 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .scroll {
+        overflow: auto;
+        max-height: 570px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        text-align: left;
+        font-size: 13px;
+      }
+      th {
+        position: sticky;
+        top: 0;
+        background: #edf2f6;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+        color: #536576;
+      }
+      th,
+      td {
+        padding: 14px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      td {
+        max-width: 260px;
+        overflow-wrap: anywhere;
+      }
+      td b {
+        display: block;
+        margin-bottom: 5px;
+      }
+      .tag {
+        font-family: ui-monospace, monospace;
+        display: inline-block;
+        background: #eef1f6;
+        padding: 5px 7px;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        font-size: 12px;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        border-radius: 5px;
+        padding: 5px 7px;
+        background: #e9eef3;
+        color: #546579;
+      }
+      .good {
+        background: #e1f1e8;
+        color: #1b7048;
+      }
+      .bad {
+        background: #fde6e4;
+        color: #a43a30;
+      }
+      .warn {
+        background: #fff0ce;
+        color: #855e0e;
+      }
+      .foot {
+        padding: 12px 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+      }
+      .foot button {
+        font-size: 12px;
+      }
+      .empty {
+        padding: 40px 20px;
+        text-align: center;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .detail-button {
+        padding: 4px 0;
+        border: 0;
+        color: var(--accent);
+        background: transparent;
+        font-size: 12px;
+      }
+      .history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        padding: 18px;
+        gap: 15px;
+      }
+      dialog {
+        width: min(820px, 95vw);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 26px;
+        color: var(--ink);
+      }
+      dialog::backdrop {
+        background: #172b3577;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        max-height: 40vh;
+        overflow: auto;
+        background: #f1f4f7;
+        padding: 16px;
+        font-size: 12px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      #demo {
+        color: #ffd183;
+      }
+      .split-detail {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+      }
+      .nowrap {
+        white-space: nowrap;
+      }
+      @media (max-width: 1050px) {
+        .tables,
+        .builder {
+          grid-template-columns: 1fr;
+        }
+        .stats {
+          grid-template-columns: repeat(3, 1fr);
+        }
+        main {
+          padding: 20px;
+        }
+        nav {
+          gap: 16px;
+          padding: 0 20px;
+        }
+      }
+      @media (max-width: 600px) {
+        .fields {
+          grid-template-columns: 1fr;
+        }
+        .wide {
+          grid-column: auto;
+        }
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
+        header {
+          padding: 20px;
+        }
+        .heading,
+        .banner {
+          align-items: start;
+          flex-direction: column;
+        }
+        nav {
+          gap: 8px;
+        }
+        nav button {
+          font-size: 12px;
+        }
+        .split-detail {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div>
+        <h1>Patch Monitor</h1>
+        <p>Hangi uygulama geçti, hangisi kaldı, hangisi bozuldu?</p>
+      </div>
+      <div>
+        <b id="demo"></b>
+        <p id="connection">Bağlantı kuruluyor…</p>
+      </div>
+    </header>
+    <nav aria-label="Ana menü">
+      <button class="active" data-tab="flow">1 · Akış tasarla</button
+      ><button data-tab="live">2 · Canlı izle</button
+      ><button data-tab="compare">3 · Önce / sonra</button
+      ><button data-tab="history">Oturum geçmişi</button>
+    </nav>
+    <main>
+      <div id="error" role="alert" hidden></div>
+      <section id="flowView">
+        <div class="heading">
+          <div>
+            <h2>Patch akışını oluştur</h2>
+            <span class="muted"
+              >Nereyi, hangi sürüm için ve ne sıklıkta izleyeceğini seç.</span
+            >
+          </div>
+          <label class="field"
+            >Kayıtlı tasarım<select id="design">
+              <option value="">Yeni tasarım</option>
+            </select></label
+          >
+        </div>
+        <div class="panel pad">
+          <h3>Hazır bir akış seç</h3>
+          <p>
+            Kayıtlı akışı seçip kapsamını kontrol et. Seçmek taramayı başlatmaz.
+            Aynı adla kaydetmek akışı günceller; kopyalamak için adını değiştir.
+          </p>
+          <div id="flowLibrary" class="choices"></div>
+        </div>
+        <div class="builder">
+          <div class="panel pad">
+            <h3>1. Hedef ve kapsam</h3>
+            <div class="fields">
+              <label class="field"
+                >Hedef sürüm<input
+                  id="target"
+                  value="1.4.1"
+                  maxlength="128"
+                /><small>Örnek: 1.4.1</small></label
+              ><label class="field"
+                >Tag eşleştirme<select id="match">
+                  <option value="release">
+                    Sürüm ailesi · 1.4.1 ve 1.4.1-…
+                  </option>
+                  <option value="exact">
+                    Birebir · yalnızca 1.4.1
+                  </option></select
+                ><small>1.4.1-1.0.44 için sürüm ailesini seç.</small></label
+              >
+              <div class="field wide">
+                İzlenecek cluster’lar
+                <div id="flowClusters" class="choices"></div>
+                <small>Bu seçim yeni oturumun kapsamını belirler.</small>
+              </div>
+              <label class="field"
+                >Namespace deseni<input
+                  id="flowPattern"
+                  value="test-*"
+                  placeholder="test-*,uat-*"
+                /><small
+                  >Virgülle ayır: test-*,uat-* iki grubu da kapsar. * tüm
+                  namespace’lerdir.</small
+                ></label
+              ><label class="field"
+                >Belirli namespace’ler (isteğe bağlı)<input
+                  id="flowNamespaces"
+                  placeholder="test-payment, test-order"
+                /><small
+                  >Virgülle ayır. Seçilen adlar ayrıca desene de
+                  uymalıdır.</small
+                ></label
+              >
+            </div>
+            <div class="section-label">2. İzleme davranışı</div>
+            <div class="fields">
+              <label class="field"
+                >Flow şablonu<select id="template"></select></label
+              ><label class="field"
+                >Tarama aralığı / saniye<input
+                  id="interval"
+                  type="number"
+                  min="1"
+                  value="5" /><small id="intervalHint"></small></label
+              ><label class="field"
+                >İzleme süresi / dakika<input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  max="720"
+                  value="60" /></label
+              ><label class="field"
+                >Tasarım adı<input
+                  id="designName"
+                  maxlength="80"
+                  placeholder="Test uygulamaları · aylık patch" /></label
+              ><label class="field wide"
+                >Açıklama<input
+                  id="designDescription"
+                  maxlength="500"
+                  placeholder="Bu akış ne zaman ve ne için kullanılacak?"
+              /></label>
+            </div>
+            <div class="actions">
+              <button id="validate">Akışı önizle</button
+              ><button id="saveDesign">Tasarımı kaydet</button
+              ><button id="create" class="primary">
+                Oturum oluştur ve başlangıcı kaydet
+              </button>
+            </div>
+            <div id="feedback" role="status"></div>
+          </div>
+          <aside class="panel pad">
+            <h3>Bu akış ne yapacak?</h3>
+            <div id="flowPreview" class="preview"></div>
+            <ol class="steps">
+              <li>
+                <b>Başlangıç durumunu kaydeder.</b><br />Patch öncesindeki
+                image’lar ve sağlık SQLite’a bir kez yazılır.
+              </li>
+              <li>
+                <b>Sen hazır olunca canlı izler.</b><br />Başlangıç kaydı
+                tamamlanınca Canlı izle sekmesindeki düğmeye bas.
+              </li>
+              <li>
+                <b>Geçişi karşılaştırır.</b><br />Hedef sürümde çalışanları,
+                sorunları ve hedef dışındakileri ayırır.
+              </li>
+              <li>
+                <b>Süre sonunda durur.</b><br />Önce / sonra sonuçları ve oturum
+                geçmişi korunur.
+              </li>
+            </ol>
+            <div class="hint">
+              Başlangıç kaydını patch başlamadan önce al. Bu araç deployment
+              yapmaz; geçişi gözlemler.
+            </div>
+            <p class="muted">
+              Namespace seçimi yöneticinin ConfigMap kapsamını daraltır. Akış
+              başladıktan sonra kapsamı değişmez; yeni kapsam için yeni oturum
+              oluştur.
+            </p>
+          </aside>
+        </div>
+      </section>
+      <div id="monitorArea" hidden>
+        <div class="heading">
+          <div>
+            <h2 id="monitorTitle">Canlı geçiş</h2>
+            <span id="sessionLabel" class="muted"></span>
+          </div>
+          <div class="actions" style="margin: 0">
+            <button id="pause">Görünümü duraklat</button
+            ><button id="stop">İzlemeyi durdur</button>
+          </div>
+        </div>
+        <div id="sessionBanner" class="banner">
+          <div>
+            <b id="statusTitle">Henüz oturum yok</b
+            ><small id="statusHelp"
+              >Önce Akış tasarla sekmesinden oturum oluştur.</small
+            >
+          </div>
+          <button id="primaryAction" class="primary" hidden></button>
+        </div>
+        <div id="clusterCards" class="cluster-cards"></div>
+        <div id="scopeBar" class="panel">
+          <label class="field"
+            >Görüntülenen cluster<select id="filterCluster">
+              <option value="">Oturumdaki tüm cluster’lar</option>
+            </select></label
+          ><label class="field"
+            >Namespace<select id="filterNamespace">
+              <option value="">Tüm namespace’ler</option>
+            </select></label
+          ><label class="field"
+            >Namespace deseni<select id="patternPreset">
+              <option value="*">Tümü</option>
+              <option value="test-*">test-*</option>
+              <option value="uat-*">uat-*</option>
+              <option value="custom">Özel desen</option></select
+            ><input
+              id="filterPattern"
+              value="*"
+              placeholder="test-payment-*"
+              hidden /></label
+          ><label class="field"
+            >Uygulama / image ara<input
+              id="search"
+              placeholder="payment, 1.4.0…" /></label
+          ><label class="check"
+            ><input id="hideInfra" type="checkbox" checked />Mesh sidecar’larını
+            gizle</label
+          ><button id="clearFilters">Filtreleri temizle</button>
+        </div>
+        <small id="filterNote"
+          >Bu filtreler tabloları ve sayaçları birlikte değiştirir; tarama
+          kapsamını değiştirmez.</small
+        >
+        <section id="liveView">
+          <div class="stats">
+            <button class="stat" data-quick="all">
+              Görüntülenen container<strong id="total">0</strong></button
+            ><button class="stat" data-quick="READY">
+              Hedef sürümde sağlıklı<strong id="ready">0</strong></button
+            ><button class="stat" data-quick="errors">
+              Hedef sürümde sorunlu<strong id="bad">0</strong></button
+            ><button class="stat" data-quick="old">
+              Hedef dışında kalan<strong id="old">0</strong>
+            </button>
+            <div class="stat">
+              Tag’i bilinmeyen<strong id="unknown">0</strong>
+            </div>
+            <div class="stat">
+              Hedefte hazır değil / pod bekliyor<strong id="pending">0</strong>
+            </div>
+          </div>
+          <div class="panel pad" style="margin-bottom: 18px">
+            <b id="progressText">Geçiş verisi bekleniyor</b>
+            <div class="progress">
+              <span id="progressFill" style="width: 0"></span>
+            </div>
+            <small
+              >Oran, bu filtredeki gerçek container’lardan hedef tag’e
+              eşleşenleri gösterir; sağlıklı olma oranı değildir.</small
+            >
+          </div>
+          <div class="tables">
+            <section class="panel">
+              <div class="table-head">
+                <div>
+                  <h3>Şu anda hangi image’lar var?</h3>
+                  <p>
+                    Gerçek pod container’ları. Tag’i bilinmeyenler eski sürüm
+                    sayılmaz.
+                  </p>
+                </div>
+                <select id="leftFilter" aria-label="Image görünümü">
+                  <option value="">Tümü</option>
+                  <option value="false">Hedef dışındakiler</option>
+                </select>
+              </div>
+              <div class="scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Uygulama / namespace</th>
+                      <th>Image tag</th>
+                      <th>Sağlık</th>
+                    </tr>
+                  </thead>
+                  <tbody id="left"></tbody>
+                </table>
+              </div>
+              <div class="foot">
+                <small id="leftInfo"></small>
+                <div>
+                  <button data-first="left">İlk sayfa</button>
+                  <button id="leftNext" data-next="left">Sonraki →</button>
+                </div>
+              </div>
+            </section>
+            <section class="panel">
+              <div class="table-head">
+                <div>
+                  <h3 id="targetHeading">Hedef sürüme geçenler</h3>
+                  <p>
+                    Hedef image tanımı ve gerçek container sağlığı birlikte.
+                  </p>
+                </div>
+                <select id="rightFilter" aria-label="Hedef sağlık filtresi">
+                  <option value="">Tüm durumlar</option>
+                  <option value="READY">Sağlıklı</option>
+                  <option value="ERRORS">Tüm hatalar</option>
+                  <option value="CRASH">Crash</option>
+                  <option value="IMAGE_PULL_ERROR">Image çekilemiyor</option>
+                  <option value="ERROR">Başlatma hatası</option>
+                  <option value="NOT_READY">Hazır değil</option>
+                  <option value="WAITING_FOR_POD">Pod bekleniyor</option>
+                </select>
+              </div>
+              <div class="scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Uygulama / namespace</th>
+                      <th>Hedef image</th>
+                      <th>Sağlık / rollout</th>
+                    </tr>
+                  </thead>
+                  <tbody id="right"></tbody>
+                </table>
+              </div>
+              <div class="foot">
+                <small id="rightInfo"></small>
+                <div>
+                  <button data-first="right">İlk sayfa</button>
+                  <button id="rightNext" data-next="right">Sonraki →</button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </section>
+        <section id="compareView" hidden>
+          <div class="heading" style="margin-top: 22px">
+            <div>
+              <h3>Patch öncesine göre ne değişti?</h3>
+              <p>
+                Sürüm geçişi ile sağlık ayrı değerlendirilir. Hedef sürüme geçen
+                bir uygulama hâlâ hata veriyor olabilir.
+              </p>
+              <small id="changeSummary"></small>
+            </div>
+            <label
+              >Sürüm durumu<select id="versionFilter">
+                <option value="">Tüm sürüm durumları</option>
+                <option value="TARGET_REACHED">Tüm podlar hedef sürümde</option>
+                <option value="NOT_UPDATED">Hedef sürüme geçmemiş</option>
+                <option value="MIXED_VERSION">
+                  Hedef ve diğer sürümler birlikte
+                </option>
+                <option value="UNKNOWN_VERSION">Tag bilinmiyor</option>
+                <option value="PARTLY_UNKNOWN">Bazı tag’ler bilinmiyor</option>
+                <option value="REMOVED">Artık gözlenmiyor</option>
+              </select></label
+            >
+            <label
+              >Sağlık değişimi<select id="changeFilter">
+                <option value="">Tüm sağlık durumları</option>
+                <option value="REGRESSION">Hatalı pod sayısı arttı</option>
+                <option value="RECOVERED">Düzelen</option>
+                <option value="PERSISTING_ERROR">Hata devam ediyor</option>
+                <option value="IMPROVING">Hatalı pod sayısı azaldı</option>
+                <option value="HEALTHY">Tümü sağlıklı</option>
+                <option value="NOT_READY">Hazır olmayan pod var</option>
+                <option value="NEW_WITH_ERRORS">Yeni kaynak, hatalı</option>
+                <option value="NEW_RESOURCE">Yeni kaynak</option>
+                <option value="REMOVED">Artık gözlenmiyor</option>
+              </select></label
+            >
+          </div>
+          <div class="panel">
+            <div class="scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Cluster / uygulama</th>
+                    <th>Başlangıçta</th>
+                    <th>Şimdi</th>
+                    <th>Sürüm durumu</th>
+                    <th>Sağlık değişimi</th>
+                  </tr>
+                </thead>
+                <tbody id="changes"></tbody>
+              </table>
+            </div>
+            <div class="foot">
+              <small
+                >Workload + container bazında gözlenen değişim; hata nedeni
+                iddiası değildir.</small
+              >
+              <div>
+                <button data-first="changes">İlk sayfa</button>
+                <button id="changesNext" data-next="changes">Sonraki →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <section id="historyView" hidden>
+        <div class="heading">
+          <div>
+            <h2>Oturum geçmişi</h2>
+            <span class="muted"
+              >Bir kaydı açarak aynı kapsamın son durumunu ve başlangıç
+              karşılaştırmasını incele.</span
+            >
+          </div>
+          <button id="reloadHistory">Yenile</button>
+        </div>
+        <div id="historyList" class="panel"></div>
+      </section>
+    </main>
+    <dialog id="detail">
+      <div class="heading">
+        <h3>Container ayrıntısı</h3>
+        <button id="closeDetail">Kapat</button>
+      </div>
+      <div id="detailSummary"></div>
+      <details>
+        <summary>Teknik JSON</summary>
+        <pre id="detailText"></pre>
+      </details>
+      <small
+        >Bu pencere açıldığı anın görüntüsüdür; canlı güncelleme pencereyi
+        kapatmaz.</small
+      >
+    </dialog>
+    <script src="/ui.js"></script>
+  </body>
+</html>

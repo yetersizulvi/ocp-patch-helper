@@ -1,0 +1,14 @@
+clusters:
+  - id: demo-local
+  - id: demo-remote
+flows:
+  patch-live:
+    interval_seconds: 2
+    stale_after_seconds: 10
+images:
+  registry_prefixes: [registry.example.com/]
+storage:
+  database_path: /tmp/patch-monitor-demo/patch.db
+  retention_days: 1
+  max_database_mb: 32
+demo: true

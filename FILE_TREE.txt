@@ -1,0 +1,66 @@
+ocp-patch-agent/
+├── Dockerfile
+├── requirements.txt
+├── README.md
+├── BUILD.md
+├── FILE_TREE.txt
+├── app/
+│   ├── __init__.py
+│   ├── main.py
+│   ├── master.py
+│   ├── config.py
+│   ├── models.py
+│   ├── runtime.py
+│   ├── scheduler.py
+│   ├── collectors.py
+│   ├── llm.py
+│   ├── transport.py
+│   ├── security.py
+│   └── logging_config.py
+├── config/
+│   └── flows.example.yaml
+├── deploy/
+│   ├── 00-namespace-rbac.yaml
+│   ├── 01-configmap.yaml
+│   ├── 02-secret.example.yaml
+│   ├── 03-deployment.yaml
+│   └── 04-master.yaml
+├── docs/
+│   └── MASTER_CONTRACT.md
+├── scripts/
+│   └── export_openapi.py
+├── openapi.json
+└── tests/
+    ├── __init__.py
+    ├── test_agent.py
+    └── test_master.py
+
+Central mode additions (0.6.0):
+Dockerfile.central
+requirements-dev.txt
+app/central.py
+app/central_config.py
+app/central_collect.py
+app/central_store.py
+app/central_ui.html
+config/central.example.yaml
+config/central.demo.yaml
+deploy/central/00-rbac.yaml
+deploy/central/01-configmap.yaml
+deploy/central/02-deployment.yaml
+deploy/central/03-route.yaml
+docs/CENTRAL_MONITOR.md
+docs/central-openapi.json
+scripts/smoke_central.py
+tests/test_central.py
+
+0.7.0 additions:
+app/central_ui.js
+docs/UPGRADE_0.7.0.md
+scripts/test_ui_dom.cjs
+tests/test_ui_revision.py
+
+0.7.1 additions:
+app/central_logging.py
+docs/LOGGING.md
+tests/test_central_logging.py

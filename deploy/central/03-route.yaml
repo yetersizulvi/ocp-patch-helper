@@ -1,0 +1,17 @@
+# Publish only on a private/authenticated ingress. This app does not implement user login.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: patch-monitor
+  namespace: patch-monitor
+  annotations:
+    haproxy.router.openshift.io/timeout: 1h
+spec:
+  to:
+    kind: Service
+    name: patch-monitor
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
