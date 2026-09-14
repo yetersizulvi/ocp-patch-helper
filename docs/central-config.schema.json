@@ -1,0 +1,262 @@
+{
+  "$defs": {
+    "Cluster": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "connection": {
+          "default": "inCluster",
+          "title": "Connection",
+          "type": "string"
+        },
+        "api_url": {
+          "default": "https://kubernetes.default.svc:443",
+          "title": "Api Url",
+          "type": "string"
+        },
+        "token_file": {
+          "default": "/var/run/secrets/kubernetes.io/serviceaccount/token",
+          "title": "Token File",
+          "type": "string"
+        },
+        "ca_file": {
+          "default": "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt",
+          "title": "Ca File",
+          "type": "string"
+        },
+        "namespace_pattern": {
+          "default": "^(test-|uat-)",
+          "title": "Namespace Pattern",
+          "type": "string"
+        },
+        "allow_http": {
+          "default": false,
+          "title": "Allow Http",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Cluster",
+      "type": "object"
+    },
+    "Flow": {
+      "additionalProperties": false,
+      "properties": {
+        "interval_seconds": {
+          "default": 5,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Interval Seconds",
+          "type": "number"
+        },
+        "request_timeout_seconds": {
+          "default": 10,
+          "maximum": 120,
+          "minimum": 1,
+          "title": "Request Timeout Seconds",
+          "type": "number"
+        },
+        "scan_timeout_seconds": {
+          "default": 120,
+          "maximum": 1800,
+          "minimum": 5,
+          "title": "Scan Timeout Seconds",
+          "type": "number"
+        },
+        "page_size": {
+          "default": 200,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Page Size",
+          "type": "integer"
+        },
+        "max_page_bytes": {
+          "default": 4194304,
+          "maximum": 16777216,
+          "minimum": 1024,
+          "title": "Max Page Bytes",
+          "type": "integer"
+        },
+        "max_objects": {
+          "default": 20000,
+          "maximum": 200000,
+          "minimum": 10,
+          "title": "Max Objects",
+          "type": "integer"
+        },
+        "max_rows": {
+          "default": 30000,
+          "maximum": 500000,
+          "minimum": 10,
+          "title": "Max Rows",
+          "type": "integer"
+        },
+        "session_max_minutes": {
+          "default": 120,
+          "maximum": 720,
+          "minimum": 1,
+          "title": "Session Max Minutes",
+          "type": "integer"
+        },
+        "failure_backoff_max_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Failure Backoff Max Seconds",
+          "type": "number"
+        },
+        "stale_after_seconds": {
+          "default": 20,
+          "minimum": 1,
+          "title": "Stale After Seconds",
+          "type": "number"
+        },
+        "resources": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Resources",
+          "type": "array"
+        }
+      },
+      "title": "Flow",
+      "type": "object"
+    },
+    "Images": {
+      "additionalProperties": false,
+      "properties": {
+        "registry_prefixes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Registry Prefixes",
+          "type": "array"
+        },
+        "tag_match_mode": {
+          "default": "exact",
+          "title": "Tag Match Mode",
+          "type": "string"
+        },
+        "release_pattern": {
+          "default": "^(\\d+\\.\\d+\\.\\d+)(?:-.+)?$",
+          "title": "Release Pattern",
+          "type": "string"
+        }
+      },
+      "title": "Images",
+      "type": "object"
+    },
+    "Scope": {
+      "additionalProperties": false,
+      "properties": {
+        "namespace_glob": {
+          "default": "*",
+          "title": "Namespace Glob",
+          "type": "string"
+        },
+        "namespaces": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Namespaces",
+          "type": "array"
+        }
+      },
+      "title": "Scope",
+      "type": "object"
+    },
+    "Storage": {
+      "additionalProperties": false,
+      "properties": {
+        "database_path": {
+          "default": "/data/patch.db",
+          "title": "Database Path",
+          "type": "string"
+        },
+        "retention_days": {
+          "default": 14,
+          "maximum": 365,
+          "minimum": 1,
+          "title": "Retention Days",
+          "type": "integer"
+        },
+        "max_database_mb": {
+          "default": 512,
+          "maximum": 10240,
+          "minimum": 8,
+          "title": "Max Database Mb",
+          "type": "integer"
+        }
+      },
+      "title": "Storage",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "clusters": {
+      "items": {
+        "$ref": "#/$defs/Cluster"
+      },
+      "maxItems": 20,
+      "minItems": 1,
+      "title": "Clusters",
+      "type": "array"
+    },
+    "flows": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Flow"
+      },
+      "title": "Flows",
+      "type": "object"
+    },
+    "images": {
+      "$ref": "#/$defs/Images"
+    },
+    "storage": {
+      "$ref": "#/$defs/Storage"
+    },
+    "config_reload_seconds": {
+      "default": 15,
+      "maximum": 300,
+      "minimum": 1,
+      "title": "Config Reload Seconds",
+      "type": "integer"
+    },
+    "stream_seconds": {
+      "default": 2,
+      "maximum": 30,
+      "minimum": 1,
+      "title": "Stream Seconds",
+      "type": "number"
+    },
+    "max_stream_clients": {
+      "default": 30,
+      "maximum": 500,
+      "minimum": 1,
+      "title": "Max Stream Clients",
+      "type": "integer"
+    },
+    "demo": {
+      "default": false,
+      "title": "Demo",
+      "type": "boolean"
+    },
+    "scope": {
+      "$ref": "#/$defs/Scope"
+    }
+  },
+  "required": [
+    "clusters"
+  ],
+  "title": "Central Patch Monitor 0.7.2 configuration",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

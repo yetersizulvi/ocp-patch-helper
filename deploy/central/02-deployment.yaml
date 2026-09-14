@@ -31,7 +31,7 @@ spec:
       terminationGracePeriodSeconds: 45
       containers:
         - name: monitor
-          image: quay.io/REPLACE_WITH_QUAY_NAMESPACE/openshift-ai-assistant:0.7.2
+          image: quay.io/REPLACE_WITH_QUAY_NAMESPACE/openshift-ai-assistant:0.7.3
           command: [uvicorn]
           args: [app.central:create_app, --factory, --host, '0.0.0.0', --port, '8080', --workers, '1', --no-server-header]
           env:

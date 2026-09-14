@@ -44,7 +44,7 @@ def view_filters(cluster: str|None=Query(None,max_length=64), namespace: str|Non
         namespace_glob=normalize_patterns(namespace_glob)
     except ValueError as exc:
         raise HTTPException(422,str(exc))
-    return dict(cluster=cluster, namespace=namespace, namespace_glob=namespace_glob,
+    return dict(cluster=cluster or None, namespace=namespace or None, namespace_glob=namespace_glob,
                 search=search, hide_infrastructure=hide_infrastructure)
 
 
@@ -62,6 +62,7 @@ class Monitor:
         self.action = asyncio.Lock()
         self.stop_event = threading.Event()
         self.tasks = []
+        self.task_session = None
         self.maintenance_task = None
         self.config_error = None
         self.storage_error = None
@@ -234,12 +235,20 @@ class Monitor:
 
     async def stop(self, sid):
         async with self.action:
-            self.store.session(sid)
+            state = self.store.session(sid)['status']
+            if state in ('STOPPED', 'COMPLETED'):
+                return
+            if state == 'STOPPING':
+                raise Conflict('Session is already stopping')
+            active = self.store.active_session_id()
+            if (active and active != sid) or (any(not t.done() for t in self.tasks) and self.task_session != sid):
+                raise Conflict('Another session is collecting')
             self.stop_event.set()
             self.store.status(sid,'STOPPING')
         await asyncio.gather(*self.tasks, return_exceptions=True)
         async with self.action:
             self.tasks = []
+            self.task_session = None
             self.store.status(sid,'STOPPED')
             emit('INFO','session_stopped',session_id=sid,scanning=False)
 
@@ -266,7 +275,7 @@ def create_app(config_path=None):
         await asyncio.gather(monitor.maintenance_task,monitor.state_log_task,*monitor.tasks,return_exceptions=True)
         monitor.store.db.close()
 
-    app = FastAPI(title='Central Patch Monitor', version='0.7.2', lifespan=lifespan)
+    app = FastAPI(title='Central Patch Monitor', version='0.7.3', lifespan=lifespan)
     app.state.monitor = monitor
 
     @app.exception_handler(KeyError)
@@ -346,6 +355,11 @@ def create_app(config_path=None):
         monitor.store.save_design(body.name,body.description,body.settings.model_dump())
         return {'name':body.name,'saved':True}
 
+    @app.delete('/api/v1/flows/designs/{name:path}')
+    def delete_design(name: str):
+        monitor.store.delete_design(name)
+        return {'name': name, 'deleted': True}
+
     @app.get('/api/v1/sessions')
     def sessions():
         return {'items':monitor.store.sessions()}
@@ -376,6 +390,7 @@ def create_app(config_path=None):
                 raise Conflict('Another session is active')
             monitor.stop_event.clear()
             monitor.store.status(sid,'CAPTURING')
+            monitor.task_session = sid
             monitor.tasks = [asyncio.create_task(monitor.capture(sid,Config.model_validate(s['config'])))]
             return monitor.public_session(sid)
 
@@ -393,17 +408,13 @@ def create_app(config_path=None):
             monitor.stop_event.clear()
             monitor.store.status(sid,'RUNNING',time.time()+s['duration'])
             emit('INFO','session_started',session_id=sid,interval_seconds=cfg.flows[s['flow']].interval_seconds)
+            monitor.task_session = sid
             monitor.tasks = [asyncio.create_task(monitor.worker(sid,c,cfg)) for c in cfg.clusters]
             monitor.tasks.append(asyncio.create_task(monitor.expire(sid)))
             return monitor.public_session(sid)
 
     @app.post('/api/v1/sessions/{sid}/stop')
     async def stop(sid: str):
-        s = monitor.store.session(sid)
-        if s['status'] in ('STOPPED','COMPLETED'):
-            return monitor.public_session(sid)
-        if s['status'] == 'INTERRUPTED' and any(not t.done() for t in monitor.tasks):
-            raise Conflict('Another session is collecting')
         await monitor.stop(sid)
         return monitor.public_session(sid)
 

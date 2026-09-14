@@ -247,3 +247,14 @@ class Store:
             if self.db.execute('SELECT COUNT(*) FROM designs').fetchone()[0]>=50 and not self.db.execute('SELECT 1 FROM designs WHERE name=?',(name,)).fetchone():
                 raise Conflict('En fazla 50 akış tasarımı kaydedilebilir')
             self.db.execute('INSERT OR REPLACE INTO designs VALUES(?,?,?)',(name,description,json.dumps(body)))
+
+    def delete_design(self, name):
+        with self.lock, self.db:
+            removed = self.db.execute('DELETE FROM designs WHERE name=?', (name,)).rowcount
+            if not removed:
+                raise KeyError(name)
+
+    def active_session_id(self):
+        with self.lock:
+            row = self.db.execute("SELECT id FROM sessions WHERE status IN ('DRAFT','CAPTURING','BASELINE_READY','RUNNING','STOPPING') LIMIT 1").fetchone()
+            return row['id'] if row else None

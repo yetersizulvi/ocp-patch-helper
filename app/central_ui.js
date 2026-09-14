@@ -64,13 +64,13 @@ let cursors = { left: "", right: "", changes: "" },
   next = {},
   history = [],
   designs = [];
-async function api(path, body) {
+async function api(path, body, method = body === undefined ? "GET" : "POST") {
   const r = await fetch(
     "/api/v1" + path,
     body === undefined
-      ? {}
+      ? { method }
       : {
-          method: "POST",
+          method,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         },
@@ -132,14 +132,17 @@ function templateChanged() {
     `Bu şablonda en az ${f.interval_seconds} saniye. Daha seyrek tarama seçebilirsin.`;
   localPreview();
 }
-async function loadFlows() {
+async function loadFlows(
+  selectedName = designs[Number($("design").value)]?.name,
+) {
+  if ($("design").value === "" && arguments.length === 0) selectedName = null;
   flows = await api("/flows");
   designs = flows.designs;
   $("flowLibrary").innerHTML =
     designs
       .map(
         (d, i) =>
-          `<button data-design="${i}"><b>${esc(d.name)}</b><small>${esc(d.description)}<br>Hedef ${esc(d.settings.target_tag)} · ${esc(d.settings.namespace_glob)}<br>${esc((d.settings.clusters || []).join(", ") || "Tüm cluster’lar")} · ${esc(d.settings.interval_seconds || "Şablon")} sn</small>Bu akışı kullan →</button>`,
+          `<div class="panel pad"><button data-design="${i}"><b>${esc(d.name)}</b><small>${esc(d.description)}<br>Hedef ${esc(d.settings.target_tag)} · ${esc(d.settings.namespace_glob)}<br>${esc((d.settings.clusters || []).join(", ") || "Tüm cluster’lar")} · ${esc(d.settings.interval_seconds || "Şablon")} sn</small>Bu akışı kullan →</button><button data-delete-design="${i}" aria-label="${esc(d.name)} akışını sil">Sil</button></div>`,
       )
       .join("") +
     ["test-*", "uat-*", "test-*,uat-*"]
@@ -154,6 +157,42 @@ async function loadFlows() {
           $("design").onchange();
         }),
     );
+  $("flowLibrary")
+    .querySelectorAll("[data-delete-design]")
+    .forEach((b) => {
+      b.onclick = async () => {
+        const d = designs[Number(b.dataset.deleteDesign)];
+        if (
+          !window.confirm(
+            `“${d.name}” akışı silinsin mi? Mevcut oturumlar ve baseline kayıtları korunur.`,
+          )
+        )
+          return;
+        b.disabled = true;
+        try {
+          clearError();
+          const selected =
+            $("design").value !== "" &&
+            designs[Number($("design").value)]?.name === d.name;
+          await api(
+            "/flows/designs/" + encodeURIComponent(d.name),
+            undefined,
+            "DELETE",
+          );
+          if (selected) {
+            $("design").value = "";
+            $("designName").value = "";
+            $("designDescription").value = "";
+          }
+          await loadFlows();
+          $("feedback").textContent =
+            `“${d.name}” akışı silindi. Oturum verileri korundu.`;
+        } catch (e) {
+          error(e);
+          b.disabled = false;
+        }
+      };
+    });
   $("flowLibrary")
     .querySelectorAll("[data-preset]")
     .forEach(
@@ -172,6 +211,8 @@ async function loadFlows() {
     designs
       .map((d, i) => `<option value="${i}">${esc(d.name)}</option>`)
       .join("");
+  const selectedIndex = designs.findIndex((d) => d.name === selectedName);
+  $("design").value = selectedIndex < 0 ? "" : String(selectedIndex);
 }
 function switchTab(name) {
   tabName = name;
@@ -490,6 +531,7 @@ $("validate").onclick = async () => {
   }
 };
 $("saveDesign").onclick = async () => {
+  $("saveDesign").disabled = true;
   try {
     clearError();
     await api("/flows/designs", {
@@ -497,21 +539,35 @@ $("saveDesign").onclick = async () => {
       description: $("designDescription").value,
       settings: form(),
     });
-    await loadFlows();
+    await loadFlows($("designName").value.trim());
     $("feedback").textContent =
       "Tasarım kaydedildi. Kayıtlı tasarım listesinden tekrar seçebilirsin.";
   } catch (e) {
     error(e);
+  } finally {
+    $("saveDesign").disabled = false;
   }
 };
 $("design").onchange = () => {
-  if ($("design").value === "") return;
+  if ($("design").value === "") {
+    $("designName").value = "";
+    $("designDescription").value = "";
+    return;
+  }
   const d = designs[Number($("design").value)],
     x = d.settings;
+  if (!flows.templates[x.flow]) {
+    error(
+      new Error(
+        "Bu akışın şablonu kaldırılmış. Geçerli bir şablon seçip yeniden kaydet.",
+      ),
+    );
+    return;
+  }
   $("template").value = x.flow;
   templateChanged();
   $("target").value = x.target_tag;
-  $("match").value = x.tag_match_mode || "exact";
+  $("match").value = x.tag_match_mode || config.images.tag_match_mode;
   $("flowPattern").value = x.namespace_glob;
   $("flowNamespaces").value = x.namespaces.join(", ");
   $("duration").value = x.duration_minutes;

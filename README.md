@@ -1,3 +1,17 @@
+# Central Patch Monitor 0.7.3
+
+See [0.7.3 changes and upgrade instructions](docs/UPGRADE_0.7.3.md) for saved-flow deletion, inventory filter fixes, and stop-request concurrency fixes. The 0.7.2 reference below remains the architectural baseline; the 0.7.3 note supersedes its statements about missing flow deletion and the fixed stop behavior. Current HTTP schema: [central-openapi.json](docs/central-openapi.json).
+
+# Central Patch Monitor: documentation entrypoint
+
+For AI models and engineers maintaining central version **0.7.2**, start with:
+
+1. [Model context and reading guide](docs/MODEL_CONTEXT.md)
+2. [Complete 0.7.2 technical reference](docs/TECHNICAL_REFERENCE_0.7.2.md)
+3. [Central HTTP OpenAPI](docs/central-openapi.json) and [configuration JSON Schema](docs/central-config.schema.json)
+
+The reference documents actual implementation details, API lifecycle, SQLite transactions, scope/matching rules, deployment, debugging, and known limitations. The older distributed master/agent mode remains in this repository and must not be confused with the central entrypoint `app.central:create_app`.
+
 # 0.7.2 — Çoklu namespace deseni, akış seçimi ve ayrı sürüm/sağlık karşılaştırması
 
 Güncelleme: [UPGRADE_0.7.2.md](docs/UPGRADE_0.7.2.md). Kapanmış oturumlar için varsayılan otomatik saklama süresi 14 gündür.

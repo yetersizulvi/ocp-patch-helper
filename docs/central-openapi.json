@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Central Patch Monitor",
-    "version": "0.7.2"
+    "version": "0.7.3"
   },
   "paths": {
     "/": {
@@ -169,6 +169,43 @@
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/flows/designs/{name}": {
+      "delete": {
+        "summary": "Delete Design",
+        "operationId": "delete_design_api_v1_flows_designs__name__delete",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Name"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",

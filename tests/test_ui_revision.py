@@ -120,3 +120,26 @@ class RevisionTests(unittest.TestCase):
         self.assertEqual(0,store.db.execute('SELECT count(*) FROM rows').fetchone()[0])
         self.assertEqual(0,store.db.execute('SELECT count(*) FROM clusters').fetchone()[0])
         self.assertTrue(store.designs())
+
+    def test_delete_design_keeps_sessions_and_handles_encoded_names(self):
+        from urllib.parse import quote
+        name='Aylık / test? #1'
+        body={'target_tag':'1.4.1','namespace_glob':'test-*,uat-*'}
+        self.assertEqual(200,self.client.post('/api/v1/flows/designs',json={'name':name,'settings':body}).status_code)
+        self.capture(**body)
+        endpoint='/api/v1/flows/designs/'+quote(name,safe='')
+        self.assertEqual(403,self.client.delete(endpoint,headers={'Origin':'https://other.example.com'}).status_code)
+        self.assertEqual(200,self.client.delete(endpoint).status_code)
+        self.assertEqual([],self.client.get('/api/v1/flows').json()['designs'])
+        self.assertEqual('BASELINE_READY',self.client.get(self.base).json()['status'])
+        self.assertTrue(self.client.get(self.base+'/images').json()['items'])
+        self.assertEqual(404,self.client.delete(endpoint).status_code)
+        self.assertIn('patch-live',self.client.get('/api/v1/flows').json()['templates'])
+
+    def test_blank_cluster_filter_matches_unfiltered_inventory(self):
+        self.capture()
+        for endpoint in ['images','targets']:
+            plain=self.client.get(self.base+'/'+endpoint).json()['items']
+            blank=self.client.get(self.base+'/'+endpoint+'?cluster=&namespace=').json()['items']
+            self.assertEqual(plain,blank)
+        self.assertTrue(self.client.get(self.base+'/images?cluster=').json()['items'])
