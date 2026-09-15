@@ -17,7 +17,9 @@ with tempfile.TemporaryDirectory() as temp:
     with socket.socket() as sock:
         sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
     env={**os.environ,'PATCH_CONFIG_FILE':str(path)}
-    process=subprocess.Popen([sys.executable,'-m','uvicorn','app.central:create_app','--factory','--host','127.0.0.1','--port',str(port)],env=env,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    log_path=Path(temp)/'server.log'
+    log_file=log_path.open('w')
+    process=subprocess.Popen([sys.executable,'-m','uvicorn','app.central:create_app','--factory','--host','127.0.0.1','--port',str(port)],env=env,stdout=log_file,stderr=subprocess.STDOUT)
     base=f'http://127.0.0.1:{port}'
     http=requests.Session();http.trust_env=False
     try:
@@ -30,6 +32,8 @@ with tempfile.TemporaryDirectory() as temp:
         def call(path,body=None):
             r=http.get(base+path,timeout=5) if body is None else http.post(base+path,json=body,timeout=5)
             r.raise_for_status();return r.json()
+        assert http.get(base+'/health/live',timeout=5).status_code==200
+        assert http.post(base+'/health/live',timeout=5).status_code==405
         assert 'Patch Monitor' in http.get(base+'/',timeout=5).text
         session=call('/api/v1/sessions',{'target_tag':'1.4.1'})
         endpoint='/api/v1/sessions/'+session['id']
@@ -59,3 +63,10 @@ with tempfile.TemporaryDirectory() as temp:
         http.close();process.terminate()
         try:process.wait(timeout=10)
         except subprocess.TimeoutExpired:process.kill();process.wait()
+        log_file.close()
+        logs=log_path.read_text()
+        assert '"GET /health/ready ' not in logs
+        assert '"GET /health/live ' not in logs
+        assert '"POST /health/live HTTP/1.1" 405' in logs
+        assert '"POST /api/v1/sessions HTTP/1.1" 201' in logs
+        print('PASS: successful health access logs suppressed; failed health and API logs retained')

@@ -79,7 +79,7 @@ class Monitor:
                     state=latest['status'] if latest else 'IDLE'
                     observed=latest['observed'] if latest else None
                     error=latest['error'] if latest else None
-                    emit('INFO','cluster_state',cluster=cluster.id,state=state,scanning=cluster.id in self.inflight,
+                    emit('INFO','cluster_state',cluster=cluster.id,session_id=latest['session'] if latest else None,state=state,scanning=cluster.id in self.inflight,
                          connection='SCAN_CANCELLED' if error=='CANCELLED' else 'LAST_SCAN_FAILED' if error else 'LAST_SCAN_SUCCEEDED' if observed else 'NOT_CHECKED',
                          last_success_age_seconds=round(time.time()-observed) if observed else None,error=error,
                          reason='No active scan; start baseline or monitoring from UI' if state not in ('CAPTURING','RUNNING') else 'Periodic collection enabled')
@@ -275,7 +275,7 @@ def create_app(config_path=None):
         await asyncio.gather(monitor.maintenance_task,monitor.state_log_task,*monitor.tasks,return_exceptions=True)
         monitor.store.db.close()
 
-    app = FastAPI(title='Central Patch Monitor', version='0.7.3', lifespan=lifespan)
+    app = FastAPI(title='Central Patch Monitor', version='0.7.4', lifespan=lifespan)
     app.state.monitor = monitor
 
     @app.exception_handler(KeyError)

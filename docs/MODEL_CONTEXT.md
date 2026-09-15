@@ -1,3 +1,5 @@
+> Current runtime: **0.7.4**. [0.7.4 release notes](UPGRADE_0.7.4.md) supersede the version banner below. Successful health probes no longer produce access log lines; failed probes remain visible. Cluster state logs include session_id.
+
 > Current runtime: **0.7.3**. Read [the 0.7.3 changes](UPGRADE_0.7.3.md) before the historical 0.7.2 baseline below. Saved designs now support DELETE; lifecycle stop ownership and duplicate-stop behavior are fixed. Configuration and database schema remain compatible with 0.7.2.
 
 # Model context: Central Patch Monitor 0.7.2

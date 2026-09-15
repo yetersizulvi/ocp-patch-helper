@@ -295,10 +295,30 @@ function options(id, values, placeholder) {
     values.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
   if (values.includes(value)) $(id).value = value;
 }
+function scanErrorMessage(code) {
+  const messages = {
+    API_HTTP_401:
+      "API kimlik doğrulaması başarısız (401). Bu cluster’ın tokenı süresi dolmuş, geçersiz veya yanlış cluster’a ait olabilir. Token Secret’ını kontrol edip güncelle.",
+    API_HTTP_403:
+      "API okuma yetkisi reddedildi (403). ServiceAccount RBAC yetkilerini kontrol et.",
+    TLS_ERROR:
+      "API sertifikası doğrulanamadı. CA dosyasını ve API hostname’ini kontrol et.",
+    TOKEN_FILE_UNREADABLE:
+      "Token dosyası okunamıyor. Secret mount’unu ve token_file yolunu kontrol et.",
+    EMPTY_TOKEN: "Token dosyası boş. Token Secret’ını güncelle.",
+    CA_FILE_UNREADABLE:
+      "CA dosyası okunamıyor. ConfigMap mount’unu ve ca_file yolunu kontrol et.",
+    CONNECTION_ERROR:
+      "API bağlantısı kurulamadı. DNS, ağ erişimi ve API adresini kontrol et.",
+    API_TIMEOUT: "API isteği zaman aşımına uğradı.",
+    CANCELLED: "Tarama iptal edildi; kısmi sonuçlar yayınlanmadı.",
+  };
+  return messages[code] || `Tarama başarısız: ${code}`;
+}
 function renderSession(s, sum) {
   session = s;
   $("sessionLabel").textContent =
-    `Hedef ${s.target} · ${s.tag_match_mode === "release" ? "Sürüm ailesi" : "Birebir tag"} · ${s.clusters.map((c) => c.cluster).join(", ")} · Kapsam: ${s.scope.namespace_glob} · ${s.flow_settings.interval_seconds} sn`;
+    `Oturum ${s.id} · Hedef ${s.target} · ${s.tag_match_mode === "release" ? "Sürüm ailesi" : "Birebir tag"} · ${s.clusters.map((c) => c.cluster).join(", ")} · Kapsam: ${s.scope.namespace_glob} · ${s.flow_settings.interval_seconds} sn`;
   options(
     "filterCluster",
     s.clusters.map((c) => c.cluster),
@@ -306,14 +326,15 @@ function renderSession(s, sum) {
   );
   $("statusTitle").textContent = labels[s.status] || s.status;
   const hints = {
-    DRAFT: "Başlangıç kaydını al veya başarısız cluster için yeniden dene.",
+    DRAFT: "Başlangıç kaydı henüz tamamlanmadı.",
     CAPTURING:
       "Cluster verileri okunuyor. Tamamlanınca canlı izlemeyi başlatabilirsin.",
     BASELINE_READY:
       "Patch öncesi durum kaydedildi. Şimdi canlı izlemeyi başlat; ardından patch geçişini yap.",
     RUNNING:
       "Tarama devam ediyor. Filtreler yalnızca görüntülenen sonuçları değiştirir.",
-    STOPPED: "Son gözlem gösteriliyor; tarama durdu.",
+    STOPPED:
+      "Oturum durduruldu. Başarılı okumalar varsa son kayıtlar gösteriliyor; yeni izleme için Akış tasarla sekmesinden yeni oturum oluştur.",
     COMPLETED:
       "İzleme süresi doldu. Sonuçları Önce / sonra sekmesinden incele.",
     INTERRUPTED:
@@ -327,6 +348,29 @@ function renderSession(s, sum) {
         Math.max(0, Math.ceil((s.ends - Date.now() / 1000) / 60)) +
         " dakika."
       : "");
+  const failed = s.clusters.filter((c) => c.error && c.error !== "CANCELLED");
+  const pending = s.clusters.filter((c) => !c.baseline).map((c) => c.cluster);
+  if (s.status === "DRAFT" || s.status === "INTERRUPTED") {
+    $("statusHelp").textContent += pending.length
+      ? ` Eksik cluster’lar: ${pending.join(", ")}.`
+      : "";
+    if (failed.length) {
+      $("statusHelp").textContent +=
+        " " +
+        failed
+          .map((c) => `${c.cluster}: ${scanErrorMessage(c.error)}`)
+          .join(" ") +
+        (pending.length
+          ? " Sorunu giderdikten sonra yalnızca eksik baseline kayıtlarını yeniden deneyebilirsin."
+          : " Sorunu giderdikten sonra canlı izlemeyi yeniden başlatabilirsin.");
+    } else if (s.status === "DRAFT") {
+      $("statusHelp").textContent += " Başlangıç kaydını alarak devam et.";
+    }
+  }
+  if (["STOPPED", "COMPLETED"].includes(s.status) && pending.length) {
+    $("statusHelp").textContent +=
+      ` Baseline tamamlanmadan kapandı; ${pending.join(", ")} için karşılaştırma eksik.`;
+  }
   const complete = s.clusters.every((c) => c.baseline);
   const action =
     ["BASELINE_READY", "INTERRUPTED"].includes(s.status) && complete
@@ -359,7 +403,7 @@ function renderSession(s, sum) {
       const old = counts
         .filter((x) => !x.target_match && x.tag_known && x.row_type === "pod")
         .reduce((n, x) => n + x.count, 0);
-      return `<div class="cluster-card"><h3>${esc(c.id)} ${state ? badge(state.freshness) : '<span class="badge">Bu oturumda seçili değil</span>'}</h3><small>${c.connection === "inCluster" ? "Bulunduğu cluster · iç API" : "Uzak cluster · API bağlantısı"}</small><p style="margin-bottom:0;font-size:13px">${state ? (state.error ? "Son tarama başarısız: " + esc(state.error) : state.observed ? "Son başarılı okuma: " + new Date(state.observed * 1000).toLocaleTimeString("tr-TR") : "Henüz başarılı veri okuması yok.") : "Konfigüre edilmiş. İzlemek için yeni akışta seç."}</p>${state ? `<p style="font-size:13px"><b>${ready}</b> hedefte sağlıklı · <b>${bad}</b> sorunlu · <b>${old}</b> hedef dışında<br><small>Aynı namespace ve arama filtreleri uygulanır.</small></p>` : ""}</div>`;
+      return `<div class="cluster-card"><h3>${esc(c.id)} ${state ? badge(state.freshness) : '<span class="badge">Bu oturumda seçili değil</span>'}</h3><small>${c.connection === "inCluster" ? "Bulunduğu cluster · iç API" : "Uzak cluster · API bağlantısı"}</small><p style="margin-bottom:0;font-size:13px">${state ? (state.error ? "Son tarama: " + esc(scanErrorMessage(state.error)) : state.observed ? "Son başarılı okuma: " + new Date(state.observed * 1000).toLocaleTimeString("tr-TR") : "Henüz başarılı veri okuması yok.") : "Konfigüre edilmiş. İzlemek için yeni akışta seç."}</p>${state ? `<p style="font-size:13px"><b>${ready}</b> hedefte sağlıklı · <b>${bad}</b> sorunlu · <b>${old}</b> hedef dışında<br><small>Aynı namespace ve arama filtreleri uygulanır.</small></p>` : ""}</div>`;
     })
     .join("");
 }
@@ -443,6 +487,10 @@ async function refresh(force = false) {
       ),
     ]);
     if (requestEpoch !== epoch || requestSid !== sid) {
+      queued = true;
+      return;
+    }
+    if (s.revision !== sum.revision || s.status !== sum.status) {
       queued = true;
       return;
     }

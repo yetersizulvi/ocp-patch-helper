@@ -1,3 +1,7 @@
+# Central Patch Monitor 0.7.4
+
+See [0.7.4 changes](docs/UPGRADE_0.7.4.md): actionable baseline/cluster errors, session correlation in logs, coherent UI status/summary refresh, and suppression of successful health access logs. API paths and storage schema remain compatible.
+
 # Central Patch Monitor 0.7.3
 
 See [0.7.3 changes and upgrade instructions](docs/UPGRADE_0.7.3.md) for saved-flow deletion, inventory filter fixes, and stop-request concurrency fixes. The 0.7.2 reference below remains the architectural baseline; the 0.7.3 note supersedes its statements about missing flow deletion and the fixed stop behavior. Current HTTP schema: [central-openapi.json](docs/central-openapi.json).
